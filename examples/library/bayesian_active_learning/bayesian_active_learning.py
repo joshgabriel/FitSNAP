@@ -38,7 +38,8 @@ import inspect
 import copy 
 import pandas as pd
 import logging
-
+from pymatgen.core.structure import Structure
+from pymatgen.io.vasp.inputs import Incar, Poscar, Kpoints, Potcar
 # TODO: check and set this in script instead of just hard-coding it here
 known_truth_for_unlabeled = True
 
@@ -408,41 +409,17 @@ class VASP_runner():
                 assert len(data) == 1, "More than one object (dataset) is in this file"
                 data = data['Dataset']
                 assert len(data['Data']) == 1, "More than one configuration in this dataset"
+
                 data['Group'] = filepath.split("/")[-2]
                 data['File'] = filepath.split("/")[-1]
                 assert all(k not in data for k in data["Data"][0].keys()), "Duplicate keys in dataset and data"
+                struct_data = data['Data'][0]
                 data.update(data.pop('Data')[0])  # Move data up one level
+            struct = Structure(lattice=struct_data['Lattice'],coords=struct_data['Positions'],species=struct_data['AtomTypes'],coords_are_cartesian=True)
+            assert struct.is_valid()
+            Poscar(struct).write_file('POSCAR_check.vasp')    
             ## make POSCAR - this (and the above section) is basically the json_to_POSCAR.py script
-            with open('POSCAR', 'w') as poscar:
-                poscar.write(data['Group']+'/'+data['File']+" converted to POSCAR \n")
-                poscar.write('1.0 \n')
-                lattice_vectors = data["Lattice"]
-                poscar.write(str(lattice_vectors[0][0]) + ' ' + str(lattice_vectors[0][1]) + ' ' + str(lattice_vectors[0][2]) + '\n')
-                poscar.write(str(lattice_vectors[1][0]) + ' ' + str(lattice_vectors[1][1]) + ' ' + str(lattice_vectors[1][2]) + '\n')
-                poscar.write(str(lattice_vectors[2][0]) + ' ' + str(lattice_vectors[2][1]) + ' ' + str(lattice_vectors[2][2]) + '\n')
-                atom_types_list = data["AtomTypes"]
-                atom_types_set = set(atom_types_list)
-                atom_type_ordered_list = list(atom_types_set)
-                atom_type_ordered_list.sort()
-                n_atoms_per_type = [0]*len(atom_type_ordered_list)
-                for i in range(0,len(atom_types_list)):
-                    for j in range(0, len(atom_type_ordered_list)):
-                        if atom_types_list[i] == atom_type_ordered_list[j]:
-                            n_atoms_per_type[j] += 1
-
-                POSCAR_atom_types_line = ''
-                POSCAR_n_atoms_per_type_line = ''
-                for i in range(len(atom_type_ordered_list)):
-                    POSCAR_atom_types_line += ' ' + atom_type_ordered_list[i]
-                    POSCAR_n_atoms_per_type_line += ' ' + str(n_atoms_per_type[i])
-                poscar.write(POSCAR_atom_types_line + '\n')
-                poscar.write(POSCAR_n_atoms_per_type_line + '\n')
-                poscar.write("Cartesian \n")
-                current_positions = data["Positions"]
-                for j in range(0, len(atom_type_ordered_list)): # loop once for each type of atom
-                    for i in range(0,len(current_positions)):  #check each atom in entire list
-                        if atom_types_list[i] == atom_type_ordered_list[j]: #if atom is the type of atom currently looking for
-                            poscar.write(str(current_positions[i][0]) + ' ' + str(current_positions[i][1]) + ' ' + str(current_positions[i][2]) + '\n') #then add atom to POSCAR file
+            # simplify with Pymatgen?
 
             # make POTCAR - currently relying on user input paths
             # TODO: add in option for defaults for elements and just a path to the VASP pseudopotential library
@@ -462,62 +439,41 @@ class VASP_runner():
                         copyfileobj(e_POT_file, potcar)
 
             # copy or create KPOINTS file
-
-            if exists('../../KPOINTS'):
+            same_structure_run = True
+            if exists('../../KPOINTS') and same_structure_run:
                 print('Using the existing KPOINTS file in the top active learning directory')
-                with open('KPOINTS', 'wb') as KPOINTS:
-                    with open('../../KPOINTS', 'rb') as source_KPOINTS:
-                        copyfileobj(source_KPOINTS, KPOINTS)
+                Kpoints.from_file('../../KPOINTS').write_file('KPOINTS')
             else:
+                l = self.settings.VASP_kpoints_auto_generation_Rk
+                Kpoints.automatic_density_by_lengths(struct,lengths=[l,l,l]).write_file('KPOINTS')
                 print('Creating a KPOINTS file with an Rk of', self.settings.VASP_kpoints_auto_generation_Rk)
-                with open('KPOINTS', 'w') as KPOINTS:
-                    KPOINTS.write("K-Points\n 0\n Auto\n ")
-                    KPOINTS.write(str(self.settings['VASP']["VASP_kpoints_auto_generation_Rk"])+"\n")
                               
             # copy or make INCAR, but adjust settings that need to change with system
 
             if exists('../../INCAR'):
+                Incar.from_file('../../INCAR').write_file('INCAR')
                 print('Using the existing INCAR file in the top active learning directory')
-                with open('INCAR', 'w') as INCAR:
-                    with open('../../INCAR', 'r') as source_INCAR:
-                        lines = source_INCAR.readlines()
-                        for i, line in enumerate(lines):
-                            if "MAGMOM" in line:
-                                # Just give everything an initial magnetic moment of 4 and let things relax down
-                                lines[i] = "MAGMOM = " + str(len(current_positions)) + "*4 \n"
-                    INCAR.write(''.join(lines))
+
             else:
-                print('Creating an INCAR file from scratch, ENCUT determined by POTCAR file')
-                with open('INCAR', 'w') as INCAR:
-                    INCAR.write("IBRION = 2 \n")  # Relaxation calculation
-                    INCAR.write("ISIF = 3 \n")    # Ionic and cell shape and cell volume all relax
-                    INCAR.write("EDIFF = 1.0e-06 \n")  # Generally high enough accuracy for anything not going beyond basic DFT (e.g. phonons, GW, BSE, etc.)
-                    INCAR.write("EDIFFG = -0.02 \n")   # Stops ionic relaxation when forces on all atoms below abs(value)
-                    INCAR.write("ISPIN = 2 \n")      # Perform spin polarized calculations
-                    INCAR.write("MAGMOM = " + str(len(current_positions)) + "*4 \n")  # Just give everything an initial magnetic moment of 4 and let things relax down
-                    INCAR.write("PREC = Accurate \n")  # Good to be safe.
-                    # TODO: The ENCUT should be determined once and saved for all future passes through the oracle.
-                    # TODO: After setting up ability to use default or file-read POTCARs, will need to adjust this section
-                    largest_ENMAX = 0
-                    for dict_key, dict_val in self.config['VASP'].items():
-                        if dict_key.endswith("_POTCAR_location"):
-                            with open(dict_val) as e_POT_file:
-                                for line in e_POT_file:
-                                    if "ENMAX" in line:
-                                        ENMAX = float(line.split()[2].strip(";"))
-                                        if ENMAX > largest_ENMAX:
-                                            largest_ENMAX = ENMAX
-                                        break  #no reason to keep reading file after locating ENMAX line
-                    INCAR.write("ENCUT = "+str(largest_ENMAX)) #taking the highest ENMAX value from all POTCARs provided in the input.txt file
-                    INCAR.write("ALGO = Fast \n")     # Usually stable, can change to normal if having problems.
-                    INCAR.write("ISMEAR = 0 \n")     # Most generally applicable smearing method, whether for metals or insulators.
-                    INCAR.write("SIGMA = 0.03 \n")   # This is a small sigma. It should be good for insulators. It may not be the best for metals.
-                    INCAR.write("LWAVE = .FALSE. \n")  # Do not write out the wavefunctions to the WAVECAR file.
-                    INCAR.write("LCHARG = .FALSE. \n") # Do not write out the charge density to the CHGCAR and CHG files.
+                inc = Incar.from_dict({'IBRION':2,
+                                 'ISIF': 3,
+                                 'EDIFF': 1e-06,
+                                 'EDIFFG': -0.02,
+                                 'ISPIN': 2,
+                                 'MAGMOM': [4 for i in len(struct)],
+                                 'PREC': 'Accurate',
+                                 'ENCUT':  520, #taking the highest ENMAX value from all POTCARs provided in the input.txt file
+                                 'ALGO': 'Fast',      # Usually stable, can change to normal if having problems.
+                                 'ISMEAR' :0,     # Most generally applicable smearing method, whether for metals or insulators.
+                                 "SIGMA": 0.03,   # This is a small sigma. It should be good for insulators. It may not be the best for metals.
+                                 "LWAVE": ".FALSE",  # Do not write out the wavefunctions to the WAVECAR file.
+                                 "LCHARG": ".FALSE.",# Do not write out the charge density to the CHGCAR and CHG files.
+                                 "NCORE": str(self.cores_per_node),
+                                 "KPAR": str(self.nodes)})
+                inc.write_file("INCAR")  
                     # This seems generally a good set of parallelization settings, and avoids some instability issues in VASP 6 on the Attaway cluster
                     # TODO: maybe do some more intelligent parallelization settings based on number of atoms and size of unit cell?
-                    INCAR.write("NCORE = "+str(self.cores_per_node)) 
-                    INCAR.write("KPAR = "+str(self.nodes))
+                print('Creating an INCAR file from scratch, ENCUT determined by POTCAR file')
                     
             # run VASP in current instance
 
