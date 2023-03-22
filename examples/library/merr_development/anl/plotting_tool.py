@@ -50,8 +50,8 @@ def errors(group, rtype, indices, df, weight_flag, covariance, fit_sam):
     mae = np.sum(np.abs(res) / nconfig)
     ssr = np.square(res).sum()
     mse = ssr / nconfig
-    rmse = np.sqrt(mse)
-    rsq = 1 - ssr / np.sum(np.square(this_true - (this_true / nconfig).sum()))
+    rmse = np.round(np.sqrt(mse),2)
+    rsq = np.round(1 - ssr / np.sum(np.square(this_true - (this_true / nconfig).sum())),2)
     error_record = {
         "Group": group,
         "Weighting": weight_flag,
@@ -83,15 +83,25 @@ def errors(group, rtype, indices, df, weight_flag, covariance, fit_sam):
 #    if config.sections["EXTRAS"].plot == 1:
 #        plt.plot(this_true, this_pred, 'ro', markersize=11, markeredgecolor='w')
 #    elif config.sections["EXTRAS"].plot > 1:
-    plt.errorbar(this_true, this_pred, yerr=pf_std, fmt = 'ro', ecolor='r', elinewidth=2, markersize=11, markeredgecolor='w')
+    plt.errorbar(this_true, this_pred, yerr=pf_std, fmt = 'ro', ecolor='r', elinewidth=2, markersize=11, markeredgecolor='w',\
+            label="Rm {0} R2 {1}".format(rmse,rsq))
             
     xmin, xmax = min(np.min(this_true),np.min(this_pred)), max(np.max(this_true),np.max(this_pred))
     plt.plot([xmin, xmax], [xmin, xmax], 'k--', linewidth=1)
-    plt.xlabel('DFT')
-    plt.ylabel('SNAP')
-    plt.title(group+'; '+rtype+'; '+weight_flag)
+    if rtype=="energy":
+        units = "eV/atom"
+    elif rtype=="force":
+        units = "eV/A"
+    elif rtype == "stress":
+        units = "stress"
+    else:
+        units = " "
+    plt.xlabel('DFT / {}'.format(units))
+    plt.ylabel('SNAP / {}'.format(units))
+    plt.title(group+'; '+rtype+'; '+"from_fit")
+    plt.legend()
     plt.gcf().tight_layout()
-    plt.savefig('dm_'+group+'_'+rtype+'_'+weight_flag+'.png')
+    plt.savefig('dm_'+group+'_'+rtype+'_from_fit.png')
     plt.clf()
 
 
@@ -110,7 +120,8 @@ fit_sam = None
 
 Row_Types = df['Row_Type'].unique()
 groups = df['Groups'].unique()
-for option in ["Unweighted", "Weighted"]:
+# weighted appears to be scaling the predictions and truth values after the weighted fit (possible double?).
+for option in ["Unweighted"]:
     weight_flag = option
     for r_type in Row_Types:
         errors("*ALL", r_type, (df['Row_Type'] == r_type), df, weight_flag, fit_cov, fit_sam)
