@@ -1,0 +1,37 @@
+
+    ______ _  __  _____  _   __ ___     ____  
+   / ____/(_)/ /_/ ___/ / | / //   |   / __ \ 
+  / /_   / // __/\__ \ /  |/ // /| |  / /_/ /
+ / __/  / // /_ ___/ // /|  // ___ | / ____/ 
+/_/    /_/ \__//____//_/ |_//_/  |_|/_/      
+
+-----23Sep22------
+Reading input...
+Hash: 3efa7ec54a7219ad92a64c88450d767b
+Finished reading input
+------------------
+mpi4py version:  3.1.4
+numpy version:  1.21.5
+scipy version:  1.9.1
+pandas version:  1.4.4
+LAMMPS (8 Feb 2023)
+-----------
+Using LAMMPSSNAP as FitSNAP calculator
+Volume_BCC : Detected  21  fitting on  21  testing on  0
+'decorated_scrape_configs' took 10.68 ms on rank 0
+>>> Matrix of descriptors takes up  0.0000 % of the total memory: 2163.6040 GB
+'decorated_process_configs' took 67.64 ms on rank 0
+'decorated_perform_fit' took 1.89 ms on rank 0
+'fit_gather' took 0.00 ms on rank 0
+'error_analysis' took 20.04 ms on rank 0
+'decorated_write_output' took 4.11 ms on rank 0
+'main' took 119.17 ms on rank 0
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+Total wall time: 0:00:00
+Error Record *ALL Energy 8.9704 0.5526
+Error Record Volume_BCC Energy 8.9704 0.5526
+Error Record *ALL Force 0.0 -0.034
+Error Record Volume_BCC Force 0.0 -0.034
+Error Record *ALL Stress 45.5609 1.0
+Error Record Volume_BCC Stress 45.5609 1.0
