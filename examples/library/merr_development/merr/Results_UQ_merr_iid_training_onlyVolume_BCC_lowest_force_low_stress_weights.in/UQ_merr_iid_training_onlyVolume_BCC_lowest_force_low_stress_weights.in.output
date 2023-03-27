@@ -70,7 +70,7 @@ override = 0
 
 -----23Sep22------
 Reading input...
-Hash: 2af3318f7324884c65316a1bb38d3b3d
+Hash: 56f6a7783908d77f0c99727105f59cd1
 Finished reading input
 ------------------
 mpi4py version:  3.1.4
@@ -81,21 +81,21 @@ LAMMPS (8 Feb 2023)
 -----------
 Using LAMMPSSNAP as FitSNAP calculator
 Volume_BCC : Detected  21  fitting on  21  testing on  0
-'decorated_scrape_configs' took 10.43 ms on rank 0
+'decorated_scrape_configs' took 10.58 ms on rank 0
 >>> Matrix of descriptors takes up  0.0000 % of the total memory: 2163.6040 GB
-'decorated_process_configs' took 67.29 ms on rank 0
+'decorated_process_configs' took 67.63 ms on rank 0
 Embedding model error in all coefficients
-'decorated_perform_fit' took 932.85 ms on rank 0
+'decorated_perform_fit' took 928.78 ms on rank 0
 'fit_gather' took 0.02 ms on rank 0
-'error_analysis' took 28.45 ms on rank 0
-'decorated_write_output' took 5.69 ms on rank 0
-'main' took 1059.45 ms on rank 0
+'error_analysis' took 28.60 ms on rank 0
+'decorated_write_output' took 5.76 ms on rank 0
+'main' took 1056.08 ms on rank 0
 OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
   using 1 OpenMP thread(s) per MPI task
 Total wall time: 0:00:00
-Error Record *ALL Energy 0.0635 1.0
-Error Record Volume_BCC Energy 0.0635 1.0
-Error Record *ALL Force 0.0 -13.3803
-Error Record Volume_BCC Force 0.0 -13.3803
-Error Record *ALL Stress 8127.0708 1.0
-Error Record Volume_BCC Stress 8127.0708 1.0
+Error Record *ALL Energy 0.0185 1.0
+Error Record Volume_BCC Energy 0.0185 1.0
+Error Record *ALL Force 0.0 -72.1249
+Error Record Volume_BCC Force 0.0 -72.1249
+Error Record *ALL Stress 6091.4166 1.0
+Error Record Volume_BCC Stress 6091.4166 1.0
