@@ -25,6 +25,32 @@ class ANL(Solver):
             training = [not elem for elem in pt.fitsnap_dict['Testing']]
             w = pt.shared_arrays['w'].array[training]
             aw, bw = w[:, np.newaxis] * pt.shared_arrays['a'].array[training], w * pt.shared_arrays['b'].array[training]
+
+            # remove rows that are all zeros, this is mostly zero forces.
+
+            indices_to_remove = [n for n,a in enumerate(aw) if np.linalg.norm(a)==0.0]
+            aw = np.delete(aw,indices_to_remove,axis=0)
+            print ("B-matrix corresponding zero rows of A-matrix", bw[indices_to_remove])
+            bw = np.delete(bw,indices_to_remove,axis=0)
+            
+            # apply normalization
+            
+            #norm_aw = []
+            #norm_bw = []
+            #for n,a in enumerate(aw):
+            #   if np.linalg.norm(a)!=0.0 and not np.isnan(np.linalg.norm(a)):
+            #      norm_aw.append(a/np.linalg.norm(a))
+            #      norm_bw.append(bw[n])
+            #   else:
+            #      norm_aw.append(a)
+            #      norm_bw.append(bw[n])
+
+            #aw = np.array(norm_aw)
+            #bw = np.array(norm_bw)
+
+            np.save('aw.npy',aw)
+            np.save('bw.npy',bw)
+
     #       TODO: See if the transpose trick works or is nonsense when feeding into the UQ algos (probably nonsense)
             if config.sections['EXTRAS'].apply_transpose:
                 if np.linalg.cond(aw)**2 < 1 / fi.epsilon:
