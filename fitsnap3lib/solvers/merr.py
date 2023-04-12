@@ -47,6 +47,8 @@ class MERR(Solver):
             cov_nugget = config.sections["SOLVER"].cov_nugget
             invptp = np.linalg.pinv(np.dot(aw.T, aw)+cov_nugget*np.diag(np.ones((nbas,))))
             invptp = invptp*0.5 + invptp.T*0.5  #forcing symmetry; can get numerically significant errors when A is ill-conditioned
+
+            # obtain the anl coefficients here
             cf = np.dot(invptp, np.dot(aw.T, bw))
             
             #bp = np.dot(bw, bw - np.dot(aw, cf))/2. numerically unstable when A is ill-conditioned
@@ -59,6 +61,10 @@ class MERR(Solver):
             merr_mult = config.sections["SOLVER"].merr_mult
             merr_method = config.sections["SOLVER"].merr_method
             merr_cfs_str = config.sections["SOLVER"].merr_cfs
+
+            # could add an option here to fix the mean of the coefficients from anl or not.
+            # now lreg_merr is going to be called with the fixed coeffs. 
+
             if merr_cfs_str == 'all':
                 ind_embed = None
                 print("Embedding model error in all coefficients")
@@ -71,7 +77,7 @@ class MERR(Solver):
 
             lreg = lreg_merr(ind_embed=ind_embed, datavar=sigmahat,
                              multiplicative=bool(merr_mult), merr_method=merr_method,
-                             method='bfgs')
+                             method='bfgs',cfs_fixed=cf)
 
             lreg.fit(aw, bw)
             self.fit = lreg.cf.copy()
