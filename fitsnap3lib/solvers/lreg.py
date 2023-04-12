@@ -125,7 +125,8 @@ def logpost_emb(x, aw=None, bw=None, ind_sig=None, datavar=0.0, multiplicative=F
 
 
 class lreg_merr(lreg):
-    def __init__(self, ind_embed=None, datavar=0.0, multiplicative=False, merr_method='abc', method='bfgs'):
+    def __init__(self, ind_embed=None, datavar=0.0, multiplicative=False, merr_method='abc', method='bfgs',\
+                cfs_fixed=None):
         super(lreg_merr, self).__init__()
 
         self.ind_embed = ind_embed
@@ -133,6 +134,7 @@ class lreg_merr(lreg):
         self.multiplicative = multiplicative
         self.merr_method = merr_method
         self.method = method
+        self.cfs_fixed = cfs_fixed
         return
 
     def fit(self, A, y):
@@ -146,10 +148,18 @@ class lreg_merr(lreg):
 
         logpost_params = {'aw': A, 'bw':y, 'ind_sig':self.ind_embed, 'datavar':self.datavar, 'multiplicative':self.multiplicative, 'merr_method':self.merr_method}
 
-        params_ini = np.random.rand(nbas+nbas_emb)
+        if self.cfs_fixed is None:
+            params_ini = np.random.rand(nbas+nbas_emb)
+            #params_ini[:nbas], residues, rank, s = lstsq(A, y, 1.0e-13)
+            invptp = np.linalg.inv(np.dot(A.T, A)+1.e-6*np.diag(np.ones((nbas,))))
+            params_ini[:nbas] = np.dot(invptp, np.dot(A.T, y))
+        else:
+            params_ini = np.random.rand(nbas_emb)
+
+        #params_ini = np.random.rand(nbas+nbas_emb)
         #params_ini[:nbas], residues, rank, s = lstsq(A, y, 1.0e-13)
-        invptp = np.linalg.inv(np.dot(A.T, A)+1.e-6*np.diag(np.ones((nbas,))))
-        params_ini[:nbas] = np.dot(invptp, np.dot(A.T, y))
+        #invptp = np.linalg.inv(np.dot(A.T, A)+1.e-6*np.diag(np.ones((nbas,))))
+        #params_ini[:nbas] = np.dot(invptp, np.dot(A.T, y))
 
         if self.method == 'mcmc':
 
@@ -182,6 +192,14 @@ class lreg_merr(lreg):
             #print(res)
             coeffs = res.x[:nbas]
             coefs_sig = res.x[nbas:]
+
+        if self.cfs_fixed is None:
+            coeffs = solution[:nbas]
+            coefs_sig = solution[nbas:]
+        else:
+            coeffs = self.cfs_fixed.copy()
+            coefs_sig = solution.copy()
+
 
         self.cf = coeffs
         coefs_sig_all = np.zeros((nbas,))
