@@ -64,12 +64,15 @@ class lsq(lreg):
 
 
 
-def logpost_emb(x, aw=None, bw=None, ind_sig=None, datavar=0.0, multiplicative=False, merr_method='abc'):
+def logpost_emb(x, aw=None, bw=None, ind_sig=None, datavar=0.0, multiplicative=False, merr_method='abc', cfs_fixed=None):
     assert(aw is not None and bw is not None)
     npt, nbas = aw.shape
 
-    cfs = x[:nbas]
-    sig_cfs = x[nbas:]
+    if cfs_fixed == None:
+       cfs = x[:nbas]
+       sig_cfs = x[nbas:]
+    else:
+       sig_cfs = x.copy()
     # if(np.min(sig_cfs)<=0.0):
     #     return -1.e+80
 
@@ -146,7 +149,7 @@ class lreg_merr(lreg):
 
         nbas_emb = len(self.ind_embed)
 
-        logpost_params = {'aw': A, 'bw':y, 'ind_sig':self.ind_embed, 'datavar':self.datavar, 'multiplicative':self.multiplicative, 'merr_method':self.merr_method}
+        logpost_params = {'aw': A, 'bw':y, 'ind_sig':self.ind_embed, 'datavar':self.datavar, 'multiplicative':self.multiplicative, 'merr_method':self.merr_method,'cfs_fixed':self.cfs_fixed}
 
         if self.cfs_fixed is None:
             params_ini = np.random.rand(nbas+nbas_emb)
