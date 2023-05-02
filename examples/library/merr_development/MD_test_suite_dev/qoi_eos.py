@@ -14,7 +14,8 @@ from pymatgen.io.lammps.data import LammpsData
 import time 
 import json
 
-
+t1 = time.time()
+evA_to_gpa = 160.21766208
 
 before_loading =\
 """
@@ -24,20 +25,21 @@ read_data       lmp.data
 
 mass    1 180.94
 
-include pot.mod
+include Ta_pot.mod
 """
 
 after_loading =\
 """
-variable latpar2 equal lx/6
+variable latpar2 equal lx/3
 compute eatom all pe/atom
 compute Sumenergy all reduce sum c_eatom
 
 velocity all create 10 34583
 timestep 5E-4
-fix 1 all nvt temp 10 293 0.05 iso 0.0 0.0 0.5
+fix 1 all nvt temp 10 293 0.05
 
-thermo_style custom step temp time pe ke etotal c_Sumenergy c_eatom press vol v_latpar2
+#thermo_style custom step temp time pe ke etotal c_Sumenergy c_eatom press vol v_latpar2
+thermo_style custom step temp time pe ke etotal c_Sumenergy v_latpar2
 thermo 1
 
 neigh_modify once no every 1 delay 0 check yes
@@ -69,31 +71,31 @@ def lammps_npt_finite_T_vol(struct,scale):
     lmp = lammps(cmdargs=["-screen","none"])
 
     # write out data file for the simulation
-    struct_out = Structure(scale*struct.lattice, struct.species,\
+    struct_out = Structure(scale*struct.lattice.matrix, struct.species,\
                  struct.frac_coords)
     LammpsData.from_structure(struct_out,atom_style='atomic').write_file("lmp.data")
     lmp.commands_string(before_loading)
     # run the simulation
     lmp.commands_string(after_loading)
 
-    lmp.command("variable     bxx equal lx")
-    lmp.command("variable     byy equal ly")
+    #lmp.command("variable     bxx equal lx")
+    #lmp.command("variable     byy equal ly")
     lmp.command("variable     vc equal vol")
     lmp.command("variable     na equal atoms")
     lmp.command("variable     etot equal etotal")
-    lmp.command("variable     ptot equal press")
+    #lmp.command("variable     ptot equal press")
 
     # extract quantities
 
     N = lmp.get_natoms()
-    press = lmp.extract_variable("ptot","all",0)
+    #press = lmp.extract_variable("ptot","all",0)
     eng = lmp.extract_variable("etot","all",0)
     vol = lmp.extract_variable("vc","all",0)
     nat = lmp.extract_variable("na","all",0)
-    bxx = lmp.extract_variable("bxx","all",0)
-    byy = lmp.extract_variable("byy","all",0)
+    #bxx = lmp.extract_variable("bxx","all",0)
+    #byy = lmp.extract_variable("byy","all",0)
 
-    return eng, press, vol, nat
+    return eng, vol, nat
 
 
 # Birch-Murnaghan function and residuals
@@ -122,9 +124,8 @@ if __name__ == "__main__":
     argv = sys.argv
  
     posfile = sys.argv[1]
-    ntypes = int(sys.argv[2])
 
-    struct = Poscar.from_file(posfile).structure
+    struct = Structure.from_file(posfile)
     struct.make_supercell([3,3,3])
 
     #------------------------
@@ -143,7 +144,7 @@ if __name__ == "__main__":
   
     for i in range(0, npoints):
       ci = clo + i*(chi-clo)/(npoints-1)
-      e_lmp[i], p_lmp[i], v_lmp[i], nat = lammps_npt_finite_T_vol(struct,ci)
+      e_lmp[i], v_lmp[i], nat = lammps_npt_finite_T_vol(struct,ci)
 
       me = MPI.COMM_WORLD.Get_rank()
       nprocs = MPI.COMM_WORLD.Get_size()
@@ -172,3 +173,5 @@ if __name__ == "__main__":
       wf.write("   DFT   |  SNAP   |   DB")
       wf.write(" %g | %g | %g" % (B0_dft,B0_sna,DE_B0))
     wf.close()
+    t2 = time.time()
+    #print (t2 - t1, " seconds completed")
