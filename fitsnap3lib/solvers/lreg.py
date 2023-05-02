@@ -64,12 +64,17 @@ class lsq(lreg):
 
 
 
-def logpost_emb(x, aw=None, bw=None, ind_sig=None, datavar=0.0, multiplicative=False, merr_method='abc'):
+def logpost_emb(x, aw=None, bw=None, ind_sig=None, datavar=0.0, multiplicative=False, merr_method='abc',cfs=None):
     assert(aw is not None and bw is not None)
     npt, nbas = aw.shape
 
-    cfs = x[:nbas]
-    sig_cfs = x[nbas:]
+    print ("logpost_emb",len(x),nbas)
+    if cfs is None:
+        cfs = x[:nbas]
+        sig_cfs = x[nbas:]
+    else:
+        sig_cfs = x.copy()
+    print ("sig_cfs dim",np.shape(sig_cfs))
     # if(np.min(sig_cfs)<=0.0):
     #     return -1.e+80
 
@@ -79,7 +84,7 @@ def logpost_emb(x, aw=None, bw=None, ind_sig=None, datavar=0.0, multiplicative=F
     if multiplicative:
         sig_cfs = np.abs(cfs[ind_sig]) * sig_cfs
 
-    #print(sig_cfs.shape[0], len(ind_sig))
+    print("Shape assertion",sig_cfs.shape[0], len(ind_sig))
     assert(sig_cfs.shape[0] == len(ind_sig))
     ss = aw[:, ind_sig] * sig_cfs
 
@@ -125,7 +130,8 @@ def logpost_emb(x, aw=None, bw=None, ind_sig=None, datavar=0.0, multiplicative=F
 
 
 class lreg_merr(lreg):
-    def __init__(self, ind_embed=None, datavar=0.0, multiplicative=False, merr_method='abc', method='bfgs'):
+    def __init__(self, ind_embed=None, datavar=0.0, multiplicative=False, merr_method='abc', method='bfgs',\
+                cfs_fixed=None):
         super(lreg_merr, self).__init__()
 
         self.ind_embed = ind_embed
@@ -133,6 +139,7 @@ class lreg_merr(lreg):
         self.multiplicative = multiplicative
         self.merr_method = merr_method
         self.method = method
+        self.cfs_fixed = cfs_fixed
         return
 
     def fit(self, A, y):
@@ -144,12 +151,22 @@ class lreg_merr(lreg):
 
         nbas_emb = len(self.ind_embed)
 
-        logpost_params = {'aw': A, 'bw':y, 'ind_sig':self.ind_embed, 'datavar':self.datavar, 'multiplicative':self.multiplicative, 'merr_method':self.merr_method}
+        logpost_params = {'aw': A, 'bw':y, 'ind_sig':self.ind_embed, 'datavar':self.datavar, 'multiplicative':self.multiplicative, 'merr_method':self.merr_method,'cfs':self.cfs_fixed}
+        print ("Saving A- and B-Matrices")
+        np.save('aw.npy',A)
+        np.save('bw.npy',y)
+        if self.cfs_fixed is None:
+            params_ini = np.random.rand(nbas+nbas_emb)
+            #params_ini[:nbas], residues, rank, s = lstsq(A, y, 1.0e-13)
+            invptp = np.linalg.inv(np.dot(A.T, A)+1.e-6*np.diag(np.ones((nbas,))))
+            params_ini[:nbas] = np.dot(invptp, np.dot(A.T, y))
+        else:
+            params_ini = np.random.rand(nbas_emb)
 
-        params_ini = np.random.rand(nbas+nbas_emb)
+        #params_ini = np.random.rand(nbas+nbas_emb)
         #params_ini[:nbas], residues, rank, s = lstsq(A, y, 1.0e-13)
-        invptp = np.linalg.inv(np.dot(A.T, A)+1.e-6*np.diag(np.ones((nbas,))))
-        params_ini[:nbas] = np.dot(invptp, np.dot(A.T, y))
+        #invptp = np.linalg.inv(np.dot(A.T, A)+1.e-6*np.diag(np.ones((nbas,))))
+        #params_ini[:nbas] = np.dot(invptp, np.dot(A.T, y))
 
         if self.method == 'mcmc':
 
@@ -163,7 +180,7 @@ class lreg_merr(lreg):
             t0 = 100
             tadapt = 100
             calib_params = {'param_ini': params_ini, 'cov_ini': covini,
-                            't0': t0, 'tadapt' : tadapt,
+                    't0': t0, 'tadapt' : tadapt,
                             'gamma' : gamma, 'nmcmc' : nmcmc}
             calib = AMCMC()
             calib.setParams(**calib_params)
@@ -173,16 +190,27 @@ class lreg_merr(lreg):
 
             np.savetxt('chn.txt', samples)
             np.savetxt('mapparam.txt', cmode)
-            coeffs = cmode[:nbas]
-            coefs_sig = cmode[nbas:]
+            if isinstance(self.cfs_fixed, np.ndarray) and self.cfs_fixed.size:
+                coeffs = self.cfs_fixed.copy()
+                coefs_sig = cmode[:nbas]
+            else:
+                coeffs = cmode[:nbas]
+                coefs_sig = cmode[nbas:]
 
         elif self.method == 'bfgs':
             #params_ini[nbas:] = np.random.rand(nbas_emb,)
             res = minimize((lambda x, fcn, p: -fcn(x, **p)), params_ini, args=(logpost_emb, logpost_params), method='BFGS', options={'gtol': 1e-3})
             #print(res)
-            coeffs = res.x[:nbas]
-            coefs_sig = res.x[nbas:]
+            if isinstance(self.cfs_fixed, np.ndarray) and self.cfs_fixed.size:
+                coeffs = self.cfs_fixed.copy()
+                coefs_sig = res.x[:nbas]
+            else:
+                coeffs = res.x[:nbas]
+                coefs_sig = res.x[nbas:]
 
+        print ("### Diagnostics BFGS ####")
+        print (res)
+        print ("#### End Diagnostics BFGS ####")
         self.cf = coeffs
         coefs_sig_all = np.zeros((nbas,))
         if self.multiplicative:
